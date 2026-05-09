@@ -2,7 +2,7 @@ import { type BookConfig, type ElementMapping } from './config'
 import { type PageSpec, specsFromConfig, getSpec, contentWidth, contentHeight } from './page-spec'
 import { prepare as pretextPrepare, layout as pretextLayout } from '@chenglou/pretext'
 
-export type { BookConfig, ElementMapping, PageSpecConfig } from './config'
+// Re-exports from config are handled by index.ts
 
 export type BreakBefore = 'auto' | 'always' | 'avoid'
 export type BreakAfter = 'auto' | 'always' | 'avoid'

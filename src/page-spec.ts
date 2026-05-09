@@ -1,7 +1,6 @@
 import { type PageSpecConfig, inches } from './config'
 
-export type { PageSpecConfig } from './config'
-export { inches, pageSpecFromInches } from './config'
+// Re-exports from config are handled by index.ts
 
 export interface PageSpec {
   name: string
