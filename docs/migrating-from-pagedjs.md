@@ -18,16 +18,24 @@ This guide helps you migrate an existing Paged.js book PDF pipeline to Folio.
 ```diff
 - await page.addScriptTag({ path: 'vendor/pagedjs/paged.polyfill.js' })
 - await page.waitForFunction(() => window.PagedPolyfill)
-+ await page.addScriptTag({ path: 'node_modules/@chenglou/pretext/dist/layout.js' })
-+ await page.addScriptTag({ path: 'vendor/folio.bundle.js' })
-+ await page.waitForFunction(() => window.Folio?.breakPages)
++ await page.addScriptTag({ path: 'node_modules/@monotykamary/folio/vendor/folio.bundle.js' })
++ await page.waitForFunction(() => window.Folio?.paginate)
 ```
 
-## Step 2: Replace Paged.js Hooks
+Or include it as a script tag in your HTML:
 
-Paged.js uses `before` and `afterRendered` hooks. Folio doesn't have hooks because it doesn't control the DOM.
+```html
+- <script src="vendor/pagedjs/paged.polyfill.js"></script>
++ <script src="node_modules/@monotykamary/folio/vendor/folio.bundle.js"></script>
+```
 
-### Before: Paged.js hooks
+## Step 2: Replace `paged.preview()` with `Folio.paginate()`
+
+Paged.js's `preview()` restructures the DOM. Folio's `paginate()` does the
+same job — measuring, page-breaking, CSS injection, code fragmentation —
+but without any DOM restructuring.
+
+### Before: Paged.js
 
 ```js
 const handlers = {
@@ -39,33 +47,51 @@ window.PagedPolyfill.registerHandlers(handlers)
 await page.evaluate(() => window.PagedPolyfill.preview())
 ```
 
-### After: Direct API calls
+### After: Folio one-call
 
 ```js
-const result = await page.evaluate((config) => {
-  const { collectContentBlocks, measureAllBlocks, breakPages } = window.Folio
+await page.evaluate((config) => {
+  const result = window.Folio.paginate(config)
+  console.log(`Estimated ${result.pagination.pages.length} pages`)
+}, config)
+```
+
+### After: Folio step-by-step
+
+If you need more control over each step:
+
+```js
+await page.evaluate((config) => {
+  const { collectContentBlocks, measureAllBlocks, breakPages,
+          injectPaginatedDOM, fragmentCodeBlocks } = window.Folio
   const blocks = collectContentBlocks(document.body, config)
   measureAllBlocks(blocks, config)
-  return breakPages(blocks, config)
+  const result = breakPages(blocks, config)
+  injectPaginatedDOM(result, config)
+  fragmentCodeBlocks()
 }, config)
 ```
 
 ## Step 3: Remove Stabilization/Freeze/Stamp Code
 
-Delete these functions entirely:
+Delete these functions entirely — they existed solely to undo paged.js's DOM restructuring:
 
 - `stabilizePagedPreviewForPdf()` — needed to undo paged.js DOM restructuring
 - `freezePagedPreviewToStaticPages()` — needed to make paged.js output printable
 - `waitForStaticPagesReady()` — needed to wait for frozen pages to settle
 - `stampPdfPageNumbers()` — needed because paged.js page numbers weren't captured by Chrome
 
-Replace with:
+Folio doesn't restructure the DOM, so none of these are needed.
+If you used `paginate()`, code fragmentation and CSS injection are already done.
+If you're calling functions individually, add:
 
 ```js
-// Fragment code blocks instead of prepareFragmentableCodeBlocks()
 await page.evaluate(() => window.Folio.fragmentCodeBlocks())
+```
 
-// Chrome handles page numbers natively
+Chrome handles page numbers natively:
+
+```js
 await page.pdf({
   displayHeaderFooter: true,
   footerTemplate: `<div style="font-size:9px; text-align:center; padding-top:4px;">

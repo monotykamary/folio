@@ -187,3 +187,52 @@ export async function paginateDocument(config: BookConfig): Promise<PaginationRe
   const result = breakPages(blocks, config)
   return result
 }
+
+export interface PaginateOptions {
+  /** Root element to paginate. Defaults to <main> or document.body. */
+  root?: Element
+  /** Fragmentation config for code blocks. Pass false to skip fragmentation. */
+  fragmentation?: FragmentationConfig | false
+  /** Inject @page CSS rules from config into the document. Default: true. */
+  injectCSS?: boolean
+}
+
+export interface PaginateResult {
+  pagination: PaginationResult
+  fragmentation: FragmentationResult | null
+  injected: boolean
+}
+
+// One-call convenience: measure, paginate, inject CSS, fragment code blocks.
+// This is the “script-tag-and-go" entry point — include folio.bundle.js,
+// call Folio.paginate(config), then print.
+export async function paginate(
+  config: BookConfig,
+  options: PaginateOptions = {}
+): Promise<PaginateResult> {
+  const root = options.root || document.querySelector('main') || document.body
+
+  // 1. Measure and paginate
+  const blocks = collectContentBlocks(root, config)
+  measureAllBlocks(blocks, config)
+  const pagination = breakPages(blocks, config)
+
+  // 2. Inject @page CSS from config
+  let injected = false
+  if (options.injectCSS !== false) {
+    const { injectPaginatedDOM } = await import('./dom-injector')
+    const result = injectPaginatedDOM(pagination, config)
+    injected = result.injectedPages > 0
+  }
+
+  // 3. Fragment code blocks
+  let fragmentation: FragmentationResult | null = null
+  if (options.fragmentation !== false) {
+    const { fragmentCodeBlocks } = await import('./code-fragmenter')
+    fragmentation = fragmentCodeBlocks(
+      options.fragmentation || undefined
+    )
+  }
+
+  return { pagination, fragmentation, injected }
+}

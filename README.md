@@ -25,6 +25,42 @@
 npm install @monotykamary/folio
 ```
 
+### Option A: Script tag in your HTML
+
+Add the script, call `paginate()`, print from the browser:
+
+```html
+<script src="node_modules/@monotykamary/folio/vendor/folio.bundle.js"></script>
+<script>
+  Folio.paginate({
+    pageWidth: '7in',
+    pageHeight: '10in',
+    pageSpecs: { default: { width: 672, height: 960, marginTop: 72, marginBottom: 96, marginLeft: 84, marginRight: 84, hasHeader: true, hasFooter: true } },
+    elementTypes: [
+      { selector: 'h1', breakInside: 'avoid', measureAs: 'heading', font: { font: '600 22px Georgia, serif', fontSize: 22, lineHeight: 28.6 } },
+      { selector: 'p', breakInside: 'auto', measureAs: 'text', font: { font: '10px Georgia, serif', fontSize: 10, lineHeight: 14.7 } },
+      { selector: 'figure', breakInside: 'avoid', measureAs: 'image' },
+      { selector: 'pre', breakInside: 'auto', measureAs: 'text', font: { font: '8px monospace', fontSize: 8, lineHeight: 12 } },
+    ],
+    fullPageClasses: [],
+    containerSelectors: [],
+    romanPageTypes: [],
+    fonts: {
+      body: { font: '10px Georgia, serif', fontSize: 10, lineHeight: 14.7 },
+      heading: { font: '600 14px Georgia, serif', fontSize: 14, lineHeight: 18.2 },
+      code: { font: '8px monospace', fontSize: 8, lineHeight: 12 },
+    },
+  }).then(result => {
+    console.log(`Estimated ${result.pagination.pages.length} pages`)
+    window.print()
+  })
+</script>
+```
+
+### Option B: Playwright / Puppeteer
+
+Load the bundle from Node, generate the PDF programmatically:
+
 ```js
 import { chromium } from 'playwright'
 import { resolve } from 'path'
@@ -38,8 +74,8 @@ await page.addScriptTag({
   path: resolve('node_modules/@monotykamary/folio/vendor/folio.bundle.js')
 })
 
-// Fragment code blocks so they break across pages
-await page.evaluate(() => window.Folio.fragmentCodeBlocks())
+// One-call: measure, paginate, inject CSS, fragment code blocks
+await page.evaluate(() => window.Folio.paginate(window.FolioConfig))
 
 // Generate the PDF
 await page.emulateMedia({ media: 'print' })
@@ -98,7 +134,7 @@ That's it. Your HTML + `@page` CSS rules → paginated PDF.
 
 ## Adding measurement
 
-The 30-second example works great for simple books. For more control over page estimation (roman numeral frontmatter, per-element measurement, custom page types), add a `BookConfig`:
+The quick-start examples work great for simple books. For more control over page estimation (roman numeral frontmatter, per-element measurement, custom page types), define a `BookConfig`:
 
 ```js
 const config = {
@@ -149,28 +185,25 @@ const config = {
 }
 ```
 
-Then use it with measurement:
+Then either call `paginate()` for the one-shot path:
 
 ```js
-await page.addScriptTag({
-  path: resolve('node_modules/@monotykamary/folio/vendor/folio.bundle.js')
-})
+const result = await window.Folio.paginate(config)
+console.log(`Estimated ${result.pagination.pages.length} pages`)
+console.log(`  ${result.pagination.totalRoman} roman, ${result.pagination.totalArabic} arabic`)
+```
 
-// Measure and estimate pagination
-const result = await page.evaluate((config) => {
-  const { collectContentBlocks, measureAllBlocks, breakPages } = window.Folio
-  const blocks = collectContentBlocks(document.body, config)
-  measureAllBlocks(blocks, config)
-  return breakPages(blocks, config)
-}, config)
+Or use the individual functions for step-by-step control:
 
-console.log(`Estimated ${result.pages.length} pages`)
-console.log(`  ${result.totalRoman} roman pages, ${result.totalArabic} arabic pages`)
+```js
+const { collectContentBlocks, measureAllBlocks, breakPages,
+        injectPaginatedDOM, fragmentCodeBlocks } = window.Folio
 
-// Fragment code blocks
-await page.evaluate(() => window.Folio.fragmentCodeBlocks())
-
-// Then page.pdf() as before
+const blocks = collectContentBlocks(document.body, config)
+measureAllBlocks(blocks, config)
+const result = breakPages(blocks, config)
+injectPaginatedDOM(result, config)
+fragmentCodeBlocks()
 ```
 
 ### Helper: `pageSpecFromInches()`
@@ -285,10 +318,11 @@ Folio was built as a Paged.js replacement. The migration is straightforward:
 
 1. **Remove** `paged.polyfill.js` and all Paged.js hooks
 2. **Delete** `stabilizePagedPreviewForPdf`, `freezePagedPreviewToStaticPages`, `waitForStaticPagesReady`, `stampPdfPageNumbers` — Folio doesn't need any of these
-3. **Replace** `prepareFragmentableCodeBlocks()` with `fragmentCodeBlocks()` — preserves existing highlighting instead of re-highlighting
-4. **Add** a `BookConfig` with your page types, element types, and fonts
-5. **Update** CSS: remove `.pagedjs_page` rules, add `@page` named-page rules
-6. **Use** Chrome's `displayHeaderFooter` for page numbers instead of PyMuPDF stamping
+3. **Replace** `paged.preview()` with `Folio.paginate(config)` — same one-call convenience, no DOM restructuring
+4. **Replace** `prepareFragmentableCodeBlocks()` with `fragmentCodeBlocks()` — preserves existing highlighting instead of re-highlighting
+5. **Add** a `BookConfig` with your page types, element types, and fonts
+6. **Update** CSS: remove `.pagedjs_page` rules, add `@page` named-page rules
+7. **Use** Chrome's `displayHeaderFooter` for page numbers instead of PyMuPDF stamping
 
 See [docs/migrating-from-pagedjs.md](docs/migrating-from-pagedjs.md) for the full step-by-step guide.
 
@@ -301,6 +335,36 @@ Paged.js restructures your DOM into `.pagedjs_page` divs. This causes:
 - **Header/footer conflicts** — Paged.js renders headers/footers as DOM elements that conflict with Chrome's own
 
 ## API Reference
+
+### `paginate(config, options?) → { pagination, fragmentation, injected }`
+
+The one-call convenience. Measures, paginates, injects CSS, and fragments code blocks — everything you need in a single function.
+
+```js
+const result = await window.Folio.paginate(config)
+result.pagination.pages.length  // estimated page count
+result.fragmentation             // { fragmentedCount, totalLines } or null
+result.injected                  // whether CSS was injected
+```
+
+Options:
+
+| Option | Default | Description |
+|---|---|---|
+| `root` | `<main>` or `<body>` | Root element to paginate |
+| `fragmentation` | default config | `FragmentationConfig` to customize, or `false` to skip |
+| `injectCSS` | `true` | Inject `@page` rules and `break-inside` selectors from config |
+
+This is equivalent to calling the individual functions manually:
+
+```js
+// paginate(config) does all of this:
+const blocks = collectContentBlocks(root, config)
+measureAllBlocks(blocks, config)
+const pagination = breakPages(blocks, config)
+injectPaginatedDOM(pagination, config)
+const fragmentation = fragmentCodeBlocks()
+```
 
 ### `fragmentCodeBlocks(config?) → { fragmentedCount, totalLines }`
 
@@ -445,7 +509,7 @@ Use `pageSpecFromInches()` to create one from inch values instead of pixel math.
 | `config.ts` | Type definitions + helpers (`inches()`, `pageSpecFromInches()`) |
 | `page-spec.ts` | Page dimension math (content area, margins) |
 | `content-block.ts` | DOM walking + Pretext text measurement |
-| `page-breaker.ts` | Pure page-breaking algorithm |
+| `page-breaker.ts` | Pure page-breaking algorithm + `paginate()` convenience |
 | `dom-injector.ts` | CSS injection for Chrome's native pagination |
 | `code-fragmenter.ts` | `<pre>` → line-level `<div>` splitting |
 

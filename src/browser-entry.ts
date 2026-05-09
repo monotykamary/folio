@@ -13,7 +13,7 @@ import {
   type BreakAfter,
   type BreakInside,
 } from './content-block'
-import { breakPages, paginateDocument, type Page, type PaginationResult } from './page-breaker'
+import { breakPages, paginateDocument, paginate, type Page, type PaginationResult, type PaginateOptions, type PaginateResult } from './page-breaker'
 import { injectPaginatedDOM, waitForAssetsReady } from './dom-injector'
 import {
   fragmentCodeBlocks,
@@ -39,6 +39,7 @@ window.Folio = {
 
   breakPages,
   paginateDocument,
+  paginate,
 
   injectPaginatedDOM,
   waitForAssetsReady,
@@ -66,6 +67,7 @@ declare global {
       measureAllBlocks: typeof measureAllBlocks
       breakPages: typeof breakPages
       paginateDocument: typeof paginateDocument
+      paginate: typeof paginate
       injectPaginatedDOM: typeof injectPaginatedDOM
       waitForAssetsReady: typeof waitForAssetsReady
       fragmentCodeBlocks: typeof fragmentCodeBlocks
