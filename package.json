@@ -1,6 +1,6 @@
 {
   "name": "@monotykamary/folio",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Book PDF pagination using @chenglou/pretext for text measurement and Chrome's native page breaking",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -27,6 +27,13 @@
     "pagedjs-alternative"
   ],
   "author": "Cheng Lou",
+  "files": [
+    "vendor/folio.bundle.js",
+    "src/",
+    "docs/",
+    "README.md",
+    "LICENSE"
+  ],
   "license": "MIT",
   "type": "module",
   "peerDependencies": {
