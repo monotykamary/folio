@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@monotykamary/folio"><img src="https://img.shields.io/npm/v/@monotykamary/folio" alt="npm version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/npm/l/@monotykamary/folio" alt="license"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/monotykamary/folio" alt="license"></a>
 </p>
 
 ## Why not Paged.js?
