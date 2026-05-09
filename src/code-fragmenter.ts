@@ -37,6 +37,43 @@ export const DEFAULT_FRAGMENTATION_CONFIG: FragmentationConfig = {
   codeBlockClass: 'code-block',
 }
 
+// Parse the next HTML tag starting at `start`, returning its end index,
+// full tag text, and type info. Handles `>` inside attribute quotes
+// and recognizes void/self-closing elements so they don't pollute the tag stack.
+function parseTag(html: string, start: number): {
+  tagEnd: number
+  tag: string
+  isClosing: boolean
+  isSelfClosing: boolean
+} | null {
+  if (html[start] !== '<') return null
+
+  let i = start + 1
+  let inSingleQuote = false
+  let inDoubleQuote = false
+  const voidElements = new Set([
+    'br', 'hr', 'img', 'input', 'meta', 'link', 'area', 'base',
+    'col', 'embed', 'source', 'track', 'wbr', 'command', 'keygen',
+  ])
+
+  while (i < html.length) {
+    const ch = html[i]
+    if (ch === '"' && !inSingleQuote) inDoubleQuote = !inDoubleQuote
+    else if (ch === "'" && !inDoubleQuote) inSingleQuote = !inSingleQuote
+    else if (ch === '>' && !inSingleQuote && !inDoubleQuote) {
+      const tag = html.substring(start, i + 1)
+      const isClosing = tag.startsWith('</')
+      const tagNameMatch = tag.match(/^<\/?(\w+)/)
+      const tagName = tagNameMatch ? tagNameMatch[1].toLowerCase() : ''
+      const isSelfClosing = tag.endsWith('/>') || voidElements.has(tagName)
+      return { tagEnd: i, tag, isClosing, isSelfClosing }
+    }
+    i++
+  }
+
+  return null
+}
+
 // Split highlighted HTML into per-line HTML strings, preserving
 // open spans across line boundaries so syntax highlighting continues.
 export function splitHighlightedHTML(html: string): string[] {
@@ -47,19 +84,17 @@ export function splitHighlightedHTML(html: string): string[] {
 
   while (i < html.length) {
     if (html[i] === '<') {
-      const tagEnd = html.indexOf('>', i)
-      if (tagEnd === -1) { currentLine += html.slice(i); break }
-      const tag = html.substring(i, tagEnd + 1)
+      const parsed = parseTag(html, i)
+      if (!parsed) { currentLine += html.slice(i); break }
+      const tag = parsed.tag
       currentLine += tag
 
-      if (tag.startsWith('</')) {
-        const tagName = tag.match(/<\/(\w+)/)
-        if (tagName && openTagStack.length > 0) openTagStack.pop()
-      } else if (!tag.endsWith('/>')) {
-        const tagMatch = tag.match(/^<(\w+[^>]*)/)
-        if (tagMatch) openTagStack.push({ name: tagMatch[1], fullTag: tag })
+      if (parsed.isClosing && openTagStack.length > 0) {
+        openTagStack.pop()
+      } else if (!parsed.isSelfClosing) {
+        openTagStack.push({ name: tag.match(/^<(\w+)/)![1], fullTag: tag })
       }
-      i = tagEnd + 1
+      i = parsed.tagEnd + 1
     } else if (html[i] === '\n') {
       const closeTags = openTagStack.slice().reverse().map(t => `</${t.name}>`).join('')
       const reopenTags = openTagStack.map(t => t.fullTag).join('')
@@ -87,6 +122,9 @@ export function fragmentCodeBlocks(
     const code = pre.querySelector('code') || pre
     const text = code.textContent || ''
     const lines = text.replace(/\r\n/g, '\n').split('\n')
+    // Remove the trailing empty string from split() that comes from the final
+    // \n on the last line. Intentional blank lines are preserved because
+    // split() produces multiple trailing empties for each \n, and we only pop one.
     if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
 
     if (lines.length < config.minLinesToFragment) return

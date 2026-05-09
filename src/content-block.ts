@@ -25,6 +25,8 @@ function elementMatches(element: Element, selector: string): boolean {
   try {
     return element.matches(selector)
   } catch {
+    // In environments where matches() isn't available (e.g., some test setups),
+    // fall back to tag-name or single-class matching.
     const tag = element.tagName.toLowerCase()
     const cls = element.className || ''
     if (typeof cls !== 'string') return selector === tag
@@ -89,11 +91,14 @@ function detectBreakInside(element: Element, config: BookConfig): BreakInside {
 }
 
 function detectChapterTitle(element: Element): string | null {
-  const h1 = element.querySelector?.('h1')
-  if (h1) return h1.textContent?.replace(/\s+/g, ' ').trim() || null
-  if (element.tagName.toLowerCase() === 'h1') {
+  const tag = element.tagName.toLowerCase()
+  // Check all heading levels, not just h1
+  const headingTags = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+  if (headingTags.has(tag)) {
     return element.textContent?.replace(/\s+/g, ' ').trim() || null
   }
+  const heading = element.querySelector?.('h1, h2, h3, h4, h5, h6')
+  if (heading) return heading.textContent?.replace(/\s+/g, ' ').trim() || null
   return null
 }
 
@@ -153,13 +158,22 @@ function makeBlock(
   }
 }
 
+const MAX_WALK_DEPTH = 100
+
 export function collectContentBlocks(
   root: Element,
   config: BookConfig
 ): ContentBlock[] {
   const blocks: ContentBlock[] = []
 
-  function walk(parent: Element, inheritedPageName: string | null = null): void {
+  function walk(parent: Element, inheritedPageName: string | null = null, depth: number = 0): void {
+    if (depth > MAX_WALK_DEPTH) {
+      console.warn(
+        `[folio] DOM walk depth exceeded ${MAX_WALK_DEPTH}. ` +
+        'Check for deeply nested containers. Some content may not be paginated.'
+      )
+      return
+    }
     const children = Array.from(parent.children)
 
     for (const child of children) {
@@ -172,7 +186,7 @@ export function collectContentBlocks(
       }
 
       if (isContainer(child, config)) {
-        walk(child, pageName)
+        walk(child, pageName, depth + 1)
         continue
       }
 
@@ -182,7 +196,7 @@ export function collectContentBlocks(
       }
 
       if (child.children.length > 0) {
-        walk(child, pageName)
+        walk(child, pageName, depth + 1)
       } else {
         blocks.push(makeBlock(child, config, pageName))
       }

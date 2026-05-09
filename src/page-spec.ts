@@ -38,7 +38,15 @@ export function getSpec(
   specs: Record<string, PageSpec>,
   name: string
 ): PageSpec {
-  return specs[name] || specs['default']!
+  if (specs[name]) return specs[name]
+  if (specs['default']) return specs['default']
+  // If no matching named spec and no 'default', return the first available spec
+  const first = Object.values(specs)[0]
+  if (first) return first
+  throw new Error(
+    `getSpec: no page spec named "${name}" and no "default" spec found. ` +
+    'Add a "default" page spec to your BookConfig.pageSpecs.'
+  )
 }
 
 export function contentWidth(spec: PageSpec): number {

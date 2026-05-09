@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { JSDOM } from 'jsdom'
 import { collectContentBlocks, measureAllBlocks } from '../src/content-block'
 import type { BookConfig, PageSpecConfig } from '../src/config'
@@ -164,6 +164,43 @@ describe('collectContentBlocks()', () => {
     const root = dom.window.document.body
     const blocks = collectContentBlocks(root, SIMPLE_CONFIG)
     expect(blocks[0].breakBefore).toBe('always')
+  })
+
+  it('detects chapter titles from h2, h3, h4 (not just h1)', () => {
+    const dom = setupDOM('<h2>Preface</h2>')
+    const root = dom.window.document.body
+    const blocks = collectContentBlocks(root, SIMPLE_CONFIG)
+    expect(blocks[0].chapterTitle).toBe('Preface')
+  })
+
+  it('detects chapter title from h3 inside a div', () => {
+    const dom = setupDOM('<div><h3>Part 1</h3><p>Text</p></div>')
+    const root = dom.window.document.body
+    const blocks = collectContentBlocks(root, SIMPLE_CONFIG)
+    expect(blocks.some(b => b.chapterTitle === 'Part 1')).toBe(true)
+  })
+
+  it('detects chapter title from h4', () => {
+    const dom = setupDOM('<h4>Section A</h4>')
+    const root = dom.window.document.body
+    const blocks = collectContentBlocks(root, SIMPLE_CONFIG)
+    expect(blocks[0].chapterTitle).toBe('Section A')
+  })
+
+  it('warns and returns early when walk depth exceeds limit', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // Build a deeply nested DOM (200 levels of nested <div>s)
+    let inner = '<p>leaf</p>'
+    for (let i = 0; i < 150; i++) {
+      inner = `<div>${inner}</div>`
+    }
+    const dom = setupDOM(inner)
+    const root = dom.window.document.body
+    const blocks = collectContentBlocks(root, SIMPLE_CONFIG)
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[folio] DOM walk depth exceeded')
+    )
+    warnSpy.mockRestore()
   })
 })
 

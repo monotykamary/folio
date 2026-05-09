@@ -46,7 +46,6 @@ export function breakPages(
   let currentSpec = getSpec(specs, 'default')
   let currentPageName = 'default'
   let runningHeader: string | null = null
-  let seenArabic = false
   const romanTypes = new Set(config.romanPageTypes)
 
   function flushPage(label: string | null = null): Page {
@@ -83,9 +82,6 @@ export function breakPages(
 
     if (block.chapterTitle) {
       runningHeader = block.chapterTitle
-      if (!romanTypes.has(blockPageName)) {
-        seenArabic = true
-      }
     }
 
     if (block.isFullPage) {
@@ -122,6 +118,14 @@ export function breakPages(
         flushPage()
       }
       startNewPage(blockPageName)
+      if (block.measuredHeightPx > availableHeight()) {
+        const tagName = block.element ? block.element.tagName.toLowerCase() : 'unknown'
+        console.warn(
+          `[folio] Block with break-inside:avoid (${tagName}) ` +
+          `measures ${block.measuredHeightPx}px but page content area is only ` +
+          `${availableHeight()}px. It will overflow the page.`
+        )
+      }
     }
 
     if (currentY + block.measuredHeightPx > avail && currentBlocks.length > 0) {

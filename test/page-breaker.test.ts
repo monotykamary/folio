@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { breakPages, type Page, type PaginationResult } from '../src/page-breaker'
 import type { ContentBlock, BreakBefore, BreakAfter, BreakInside } from '../src/content-block'
 import type { BookConfig, PageSpecConfig } from '../src/config'
@@ -57,6 +57,41 @@ const BASE_CONFIG: BookConfig = {
 }
 
 describe('breakPages()', () => {
+  it('warns when an avoid-block is taller than the page content area', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // Content height is 792px. A 1000px avoid-block can't fit even on an empty page.
+    const blocks = [mockBlock({ measuredHeightPx: 1000, breakInside: 'avoid' })]
+    const result = breakPages(blocks, BASE_CONFIG)
+    expect(result.pages).toHaveLength(1)
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[folio] Block with break-inside:avoid')
+    )
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('1000px')
+    )
+    warnSpy.mockRestore()
+  })
+
+  it('does not warn when an avoid-block fits on a fresh page', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const blocks = [mockBlock({ measuredHeightPx: 700, breakInside: 'avoid' })]
+    const result = breakPages(blocks, BASE_CONFIG)
+    expect(result.pages).toHaveLength(1)
+    expect(warnSpy).not.toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it('does not set seenArabic flag (variable was removed)', () => {
+    // This tests that the removed seenArabic variable doesn't cause issues.
+    // The variable was set but never read, so removing it is a no-op.
+    const blocks = [mockBlock({ measuredHeightPx: 100, chapterTitle: 'Chapter 1' })]
+    const result = breakPages(blocks, BASE_CONFIG)
+    expect(result.pages[0].headerText).toBe('Chapter 1')
+    expect(result.totalArabic).toBe(1)
+    expect(result.totalRoman).toBe(0)
+  })
+
+
   it('places a single small block on one page', () => {
     const blocks = [mockBlock({ measuredHeightPx: 100 })]
     const result = breakPages(blocks, BASE_CONFIG)

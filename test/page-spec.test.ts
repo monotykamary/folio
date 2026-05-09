@@ -59,6 +59,20 @@ describe('getSpec()', () => {
     const specs = specsFromConfig({ default: DEFAULT_SPEC })
     expect(getSpec(specs, 'nonexistent').name).toBe('default')
   })
+
+  it('falls back to the first available spec when no default exists', () => {
+    const specs = specsFromConfig({ cover: COVER_SPEC, chapter: CHAPTER_SPEC })
+    const result = getSpec(specs, 'nonexistent')
+    // Should return the first spec (cover, since Object.entries order is insertion order)
+    expect(result.name).toBe('cover')
+  })
+
+  it('throws a descriptive error when no specs exist at all', () => {
+    const specs = specsFromConfig({})
+    expect(() => getSpec(specs, 'anything')).toThrow(
+      'no page spec named "anything"'
+    )
+  })
 })
 
 describe('contentWidth()', () => {
