@@ -5,11 +5,11 @@
 <h1 align="center">@monotykamary/folio</h1>
 
 <p align="center">
-  <em>Book PDF pagination using <a href="https://github.com/chenglou/pretext">@chenglou/pretext</a> for text measurement and Chrome's native <code>page.pdf()</code> for rendering.</em>
+  <strong>Turn HTML into a paginated book PDF.</strong>
 </p>
 
 <p align="center">
-  Replaces <a href="https://pagedjs.org/">Paged.js</a> for book PDF generation.
+  Measure with <a href="https://github.com/chenglou/pretext">Pretext</a>, paginate with Chrome — no DOM restructuring, no stabilization, no double-pagination.
 </p>
 
 <p align="center">
@@ -17,151 +17,35 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/monotykamary/folio?logo=opensourceinitiative&logoColor=white" alt="license"></a>
 </p>
 
-## Why not Paged.js?
+---
 
-Paged.js takes over pagination by restructuring your DOM into `.pagedjs_page` divs. This causes:
-
-- **Double pagination** — Paged.js paginates, then Chrome re-paginates on print
-- **800+ lines of stabilization** — You need `stabilizePagedPreviewForPdf`, `freezePagedPreviewToStaticPages`, `waitForStaticPagesReady`, and `stampPdfPageNumbers` to undo the DOM restructuring so Chrome can actually print it
-- **Header/footer conflicts** — Paged.js renders headers/footers as DOM elements that conflict with Chrome's own
-
-**Folio's approach**: measure with Pretext, paginate with Chrome's native engine. No DOM restructuring, no stabilization, no double-pagination.
-
-## How it works
-
-```
-Your HTML document
-  ↓
-You provide a BookConfig (page sizes, element types, fonts)
-  ↓
-Folio collects and measures content blocks using Pretext
-  ↓
-Page-breaking algorithm estimates page assignments
-  ↓
-Folio fragments code blocks for cross-page breaking
-  ↓
-Chrome's page.pdf() uses CSS @page rules for actual pagination
-  ↓
-PDF output
-```
-
-## Installation
+## Get a book PDF in 30 seconds
 
 ```sh
-npm install @monotykamary/folio @chenglou/pretext
+npm install @monotykamary/folio
 ```
-
-## Quick Start
-
-### 1. Define your book config
-
-```js
-import { inches, pageSpecFromInches } from '@monotykamary/folio'
-
-const config = {
-  pageWidth: '7in',
-  pageHeight: '10in',
-  pageSpecs: {
-    cover: pageSpecFromInches({ widthIn: 7, heightIn: 10 }),
-    'title-page': pageSpecFromInches({ widthIn: 7, heightIn: 10 }),
-    frontmatter: pageSpecFromInches({
-      widthIn: 7, heightIn: 10,
-      marginTopIn: 0.75, marginBottomIn: 1,
-      marginLeftIn: 0.875, marginRightIn: 0.875,
-      hasFooter: true,
-    }),
-    chapter: pageSpecFromInches({
-      widthIn: 7, heightIn: 10,
-      marginTopIn: 0.75, marginBottomIn: 1,
-      marginLeftIn: 0.875, marginRightIn: 0.875,
-      hasHeader: true, hasFooter: true,
-    }),
-    default: pageSpecFromInches({
-      widthIn: 7, heightIn: 10,
-      marginTopIn: 0.75, marginBottomIn: 1,
-      marginLeftIn: 0.875, marginRightIn: 0.875,
-      hasHeader: true, hasFooter: true,
-    }),
-  },
-
-  // How to detect, classify, and measure HTML elements
-  elementTypes: [
-    // Standard HTML elements
-    { selector: 'h1', pageName: null, breakInside: 'avoid', measureAs: 'heading',
-      font: { font: '600 22px Georgia, serif', fontSize: 22, lineHeight: 28.6 } },
-    { selector: 'h2', pageName: null, breakInside: 'avoid', measureAs: 'heading',
-      font: { font: '600 14px Georgia, serif', fontSize: 14, lineHeight: 18.2 } },
-    { selector: 'p', pageName: null, breakInside: 'auto', measureAs: 'text',
-      font: { font: '10px Georgia, serif', fontSize: 10, lineHeight: 14.7 } },
-    { selector: 'pre', pageName: null, breakInside: 'auto', measureAs: 'text',
-      font: { font: '8px monospace', fontSize: 8, lineHeight: 12 } },
-    { selector: 'figure', pageName: null, breakInside: 'avoid', measureAs: 'image' },
-    { selector: 'table', pageName: null, breakInside: 'avoid', measureAs: 'table' },
-
-    // Named page types — elements that define a page's margin/layout
-    { selector: '.cover', pageName: 'cover', breakInside: 'avoid',
-      isFullPage: true, measureAs: 'fixed', fixedHeight: 960 },
-    { selector: '.title-page', pageName: 'title-page', breakInside: 'avoid',
-      isFullPage: true, measureAs: 'fixed', fixedHeight: 960 },
-    { selector: '.chapter-start', pageName: 'chapter', breakInside: 'auto' },
-
-    // Custom content elements with their own measurement rules
-    { selector: '.callout', pageName: null, breakInside: 'avoid', measureAs: 'text',
-      font: { font: '9.5px Georgia, serif', fontSize: 9.5, lineHeight: 13.8 },
-      contentWidth: 540, heightPadding: 24 },
-  ],
-
-  // CSS class names that indicate full-bleed (zero-margin) pages
-  fullPageClasses: ['cover', 'title-page'],
-
-  // Structural containers — walked into, not measured as a whole
-  containerSelectors: ['.chapter-content'],
-
-  // Page types that get roman numeral labels
-  romanPageTypes: ['frontmatter'],
-
-  // Default font specs for fallback measurement
-  fonts: {
-    body: { font: '10px Georgia, serif', fontSize: 10, lineHeight: 14.7 },
-    heading: { font: '600 14px Georgia, serif', fontSize: 14, lineHeight: 18.2 },
-    code: { font: '8px monospace', fontSize: 8, lineHeight: 12 },
-  },
-}
-```
-
-### 2. Use with Playwright
 
 ```js
 import { chromium } from 'playwright'
+import { resolve } from 'path'
 
-const browser = await chromium.launch({ headless: true })
+const browser = await chromium.launch()
 const page = await browser.newPage()
-await page.goto('http://localhost:9999', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:8080/my-book.html', { waitUntil: 'networkidle' })
 
-// Load the Pretext + Folio bundles
-await page.addScriptTag({ path: 'node_modules/@chenglou/pretext/dist/layout.js' })
-await page.addScriptTag({ path: 'vendor/folio.bundle.js' })
-
-// Measure and estimate pagination
-const result = await page.evaluate((config) => {
-  const { collectContentBlocks, measureAllBlocks, breakPages } = window.Folio
-  const blocks = collectContentBlocks(document.body, config)
-  measureAllBlocks(blocks, config)
-  return breakPages(blocks, config)
-}, config)
-
-console.log(`Estimated ${result.pages.length} pages`)
-
-// Fragment code blocks so they can break across pages
-await page.evaluate(() => {
-  window.Folio.fragmentCodeBlocks()
+// Load Folio (includes Pretext — no separate script needed)
+await page.addScriptTag({
+  path: resolve('node_modules/@monotykamary/folio/vendor/folio.bundle.js')
 })
 
-// Generate PDF — Chrome handles pagination natively
+// Fragment code blocks so they break across pages
+await page.evaluate(() => window.Folio.fragmentCodeBlocks())
+
+// Generate the PDF
 await page.emulateMedia({ media: 'print' })
 await page.pdf({
-  width: config.pageWidth,
-  height: config.pageHeight,
+  path: 'my-book.pdf',
+  width: '7in', height: '10in',
   printBackground: true,
   preferCSSPageSize: true,
   displayHeaderFooter: true,
@@ -177,17 +61,328 @@ await page.pdf({
 await browser.close()
 ```
 
-## API
+That's it. Your HTML + `@page` CSS rules → paginated PDF.
 
-### Config Types
+## How it works
 
-#### `BookConfig`
-Top-level configuration object:
+```
+┌──────────────────────────────────────────────────────┐
+│                    Your HTML                         │
+│         + CSS @page rules for layout                 │
+└──────────────────────┬───────────────────────────────┘
+                       │
+          ┌────────────▼────────────┐
+          │    Folio + Pretext      │
+          │                         │
+          │  • Walks the DOM        │
+          │  • Measures text        │
+          │  • Estimates pages      │
+          │  • Fragments code       │
+          │  • Injects CSS          │
+          └────────────┬────────────┘
+                       │
+          ┌────────────▼────────────┐
+          │   Chrome page.pdf()     │
+          │                         │
+          │  Uses your @page CSS    │
+          │  for actual pagination  │
+          │  and rendering          │
+          └────────────┬────────────┘
+                       │
+              ┌────────▼────────┐
+              │   Book PDF 📖   │
+              └─────────────────┘
+```
+
+**Folio never restructures your DOM.** It measures content to estimate pagination and injects CSS to help Chrome's native print renderer do its job. Chrome handles the actual page breaks — no double-pagination, no stabilization, no freeze/stamp pipeline.
+
+## Adding measurement
+
+The 30-second example works great for simple books. For more control over page estimation (roman numeral frontmatter, per-element measurement, custom page types), add a `BookConfig`:
+
+```js
+const config = {
+  pageWidth: '7in',
+  pageHeight: '10in',
+
+  // Named page types — each can have its own margins, header/footer
+  pageSpecs: {
+    cover:     { width: 672, height: 960, marginTop: 0, ...rest: 0, hasHeader: false, hasFooter: false },
+    chapter:  { width: 672, height: 960, marginTop: 72, marginBottom: 96, marginLeft: 84, marginRight: 84, hasHeader: true, hasFooter: true },
+    default:  { width: 672, height: 960, marginTop: 72, marginBottom: 96, marginLeft: 84, marginRight: 84, hasHeader: true, hasFooter: true },
+  },
+
+  // How Folio recognizes and measures your HTML elements
+  elementTypes: [
+    // Standard HTML — Folio measures these with Pretext
+    { selector: 'h1', breakInside: 'avoid', measureAs: 'heading',
+      font: { font: '600 22px Georgia, serif', fontSize: 22, lineHeight: 28.6 } },
+    { selector: 'p', breakInside: 'auto', measureAs: 'text',
+      font: { font: '10px Georgia, serif', fontSize: 10, lineHeight: 14.7 } },
+    { selector: 'figure', breakInside: 'avoid', measureAs: 'image' },
+
+    // Named pages — elements that define a page's layout
+    { selector: '.cover', pageName: 'cover', isFullPage: true, measureAs: 'fixed', fixedHeight: 960 },
+    { selector: '.chapter', pageName: 'chapter' },
+
+    // Custom elements with their own measurement rules
+    { selector: '.callout', breakInside: 'avoid', measureAs: 'text',
+      font: { font: '9.5px Georgia, serif', fontSize: 9.5, lineHeight: 13.8 },
+      contentWidth: 540, heightPadding: 24 },
+  ],
+
+  // Full-bleed pages (zero margins)
+  fullPageClasses: ['cover'],
+
+  // Structural containers — Folio walks into these, doesn't measure as a block
+  containerSelectors: ['.chapter-content'],
+
+  // Frontmatter gets roman numerals (i, ii, iii...)
+  romanPageTypes: ['frontmatter'],
+
+  // Fallback fonts for unlabeled elements
+  fonts: {
+    body:    { font: '10px Georgia, serif', fontSize: 10, lineHeight: 14.7 },
+    heading: { font: '600 14px Georgia, serif', fontSize: 14, lineHeight: 18.2 },
+    code:    { font: '8px monospace', fontSize: 8, lineHeight: 12 },
+  },
+}
+```
+
+Then use it with measurement:
+
+```js
+await page.addScriptTag({
+  path: resolve('node_modules/@monotykamary/folio/vendor/folio.bundle.js')
+})
+
+// Measure and estimate pagination
+const result = await page.evaluate((config) => {
+  const { collectContentBlocks, measureAllBlocks, breakPages } = window.Folio
+  const blocks = collectContentBlocks(document.body, config)
+  measureAllBlocks(blocks, config)
+  return breakPages(blocks, config)
+}, config)
+
+console.log(`Estimated ${result.pages.length} pages`)
+console.log(`  ${result.totalRoman} roman pages, ${result.totalArabic} arabic pages`)
+
+// Fragment code blocks
+await page.evaluate(() => window.Folio.fragmentCodeBlocks())
+
+// Then page.pdf() as before
+```
+
+### Helper: `pageSpecFromInches()`
+
+Writing pixel values is error-prone. Use the helper:
+
+```js
+import { pageSpecFromInches } from '@monotykamary/folio'
+
+pageSpecFromInches({
+  widthIn: 7, heightIn: 10,
+  marginTopIn: 0.75, marginBottomIn: 1,
+  marginLeftIn: 0.875, marginRightIn: 0.875,
+  hasHeader: true, hasFooter: true,
+})
+```
+
+## Page anatomy
+
+A book page in Folio has three zones. Your `@page` CSS controls the margins:
+
+```
+┌───────────────────────────────────────┐
+│  margin-top                           │
+│  ┌──────────────────────────────────┐ │
+│  │  [header — running chapter name] │ │  ← hasHeader
+│  │                                  │ │
+│  │         content area             │ │
+│  │                                  │ │
+│  │    Your paragraphs, code,        │ │
+│  │    images, tables, callouts...   │ │
+│  │                                  │ │
+│  │                                  │ │
+│  │  [footer — page number]          │ │  ← hasFooter
+│  └──────────────────────────────────┘ │
+│  margin-bottom                        │
+└───────────────────────────────────────┘
+```
+
+- **`page.pdf(margin: 0)`** — Always. Folio uses CSS `@page` rules for margins, not Chrome's API.
+- **`displayHeaderFooter: true`** — Chrome renders the header/footer inside the margin area.
+- **`hasHeader` / `hasFooter`** — In your page spec, tells Folio whether to assign header text / page labels.
+
+## Code blocks that break across pages
+
+Chrome applies `break-inside: avoid` to `<pre>` elements, pushing entire code blocks to the next page. A 25-line code block can leave a 6-inch gap.
+
+Folio fragments code blocks into line-level `<div>`s:
+
+```js
+await page.evaluate(() => {
+  const result = window.Folio.fragmentCodeBlocks()
+  console.log(`Fragmented ${result.fragmentedCount} blocks into ${result.totalLines} lines`)
+})
+```
+
+Each line still has `break-inside: avoid` (no mid-line breaks), but the block **can** break between lines. Syntax highlighting is preserved — Folio tracks open `<span>` tags and closes/reopens them at line boundaries.
+
+See [docs/code-fragmentation.md](docs/code-fragmentation.md) for details and configuration.
+
+## Full-bleed pages
+
+Covers, title pages, part dividers — pages with zero margins where content extends to the edges:
+
+```css
+@media print {
+  @page cover { margin: 0; }
+  @page fullpage-image { margin: 0; }
+}
+```
+
+```js
+// In your config:
+elementTypes: [
+  { selector: '.cover', pageName: 'cover', isFullPage: true,
+    measureAs: 'fixed', fixedHeight: 960 },
+  { selector: '.fullpage-illustration', pageName: 'fullpage-image',
+    isFullPage: true, measureAs: 'fixed', fixedHeight: 960 },
+],
+fullPageClasses: ['cover', 'fullpage-illustration'],
+```
+
+Folio places full-page elements on their own page. See [docs/full-bleed-pages.md](docs/full-bleed-pages.md) for fullpage illustrations, part dividers, and Chrome's `object-fit` bug.
+
+## Page numbering
+
+Frontmatter gets roman numerals, body gets arabic — the standard convention:
+
+```js
+romanPageTypes: ['frontmatter'],
+```
+
+Chrome's `footerTemplate` renders the numbers:
+
+```js
+await page.pdf({
+  displayHeaderFooter: true,
+  footerTemplate: `
+    <div style="font-size:9px; font-family:sans-serif; color:#666;
+                width:100%; text-align:center; padding-top:4px;">
+      <span class="pageNumber"></span>
+    </div>`,
+  // ...
+})
+```
+
+Suppress page numbers on full-bleed pages by setting `hasFooter: false` in their page spec. See [docs/page-numbering.md](docs/page-numbering.md).
+
+## Migrating from Paged.js
+
+Folio was built as a Paged.js replacement. The migration is straightforward:
+
+1. **Remove** `paged.polyfill.js` and all Paged.js hooks
+2. **Delete** `stabilizePagedPreviewForPdf`, `freezePagedPreviewToStaticPages`, `waitForStaticPagesReady`, `stampPdfPageNumbers` — Folio doesn't need any of these
+3. **Replace** `prepareFragmentableCodeBlocks()` with `fragmentCodeBlocks()` — preserves existing highlighting instead of re-highlighting
+4. **Add** a `BookConfig` with your page types, element types, and fonts
+5. **Update** CSS: remove `.pagedjs_page` rules, add `@page` named-page rules
+6. **Use** Chrome's `displayHeaderFooter` for page numbers instead of PyMuPDF stamping
+
+See [docs/migrating-from-pagedjs.md](docs/migrating-from-pagedjs.md) for the full step-by-step guide.
+
+### Why not Paged.js?
+
+Paged.js restructures your DOM into `.pagedjs_page` divs. This causes:
+
+- **Double pagination** — Paged.js paginates, then Chrome re-paginates on print
+- **800+ lines of stabilization** — You need `stabilizePagedPreviewForPdf`, `freezePagedPreviewToStaticPages`, `waitForStaticPagesReady`, and `stampPdfPageNumbers` to undo the DOM restructuring so Chrome can actually print it
+- **Header/footer conflicts** — Paged.js renders headers/footers as DOM elements that conflict with Chrome's own
+
+## API Reference
+
+### `fragmentCodeBlocks(config?) → { fragmentedCount, totalLines }`
+
+Fragment `<pre>` elements into line-level `<div>`s. Short blocks (< 8 lines) are left alone.
+
+```js
+// With defaults:
+window.Folio.fragmentCodeBlocks()
+
+// Custom thresholds and class names:
+window.Folio.fragmentCodeBlocks({
+  minLinesToFragment: 4,
+  containerClass: 'my-code',
+  lineClass: 'my-line',
+  lineDataAttr: 'data-line',
+})
+```
+
+### `collectContentBlocks(root, config) → ContentBlock[]`
+
+Walk the DOM and collect leaf-level content blocks. Uses your `elementTypes` for detection, `fullPageClasses` for full-bleed, `containerSelectors` for structural containers.
+
+```js
+const blocks = window.Folio.collectContentBlocks(document.body, config)
+// blocks[i] = { element, pageName, breakInside, measuredHeightPx, isFullPage, ... }
+```
+
+### `measureAllBlocks(blocks, config)`
+
+Measure all blocks using Pretext's text measurement. Populates `ContentBlock.measuredHeightPx` in place.
+
+```js
+window.Folio.measureAllBlocks(blocks, config)
+// blocks[0].measuredHeightPx → 42.5
+```
+
+### `breakPages(blocks, config) → PaginationResult`
+
+Run the page-breaking algorithm. Pure function — no DOM side effects.
+
+```js
+const result = window.Folio.breakPages(blocks, config)
+result.pages        // Page[] — page assignments
+result.totalArabic  // Number of body pages
+result.totalRoman   // Number of frontmatter pages
+```
+
+### `injectPaginatedDOM(result, config) → InjectionResult`
+
+Inject CSS `@page` rules and `break-inside` selectors from your config into the document.
+
+```js
+window.Folio.injectPaginatedDOM(result, config)
+```
+
+### `waitForAssetsReady() → { imageCount, loadedImages }`
+
+Wait for all images and fonts to finish loading before generating the PDF.
+
+```js
+const { imageCount, loadedImages } = await window.Folio.waitForAssetsReady()
+```
+
+### `splitHighlightedHTML(html) → string[]`
+
+Split syntax-highlighted HTML into per-line strings, preserving open `<span>` tags across newlines. Used internally by `fragmentCodeBlocks()`, but available for custom use.
+
+```js
+window.Folio.splitHighlightedHTML('<span class="hljs-keyword">SELECT</span> id\nFROM users')
+// → ['<span class="hljs-keyword">SELECT</span> id</span>',
+//    '<span class="hljs-keyword">FROM</span> users']
+```
+
+### Config types
+
+<details>
+<summary><strong>BookConfig</strong></summary>
 
 | Field | Type | Description |
 |---|---|---|
-| `pageWidth` | `string` | CSS length, e.g. `'7in'` or `'210mm'` |
-| `pageHeight` | `string` | CSS length, e.g. `'10in'` or `'297mm'` |
+| `pageWidth` | `string` | CSS length (`'7in'`, `'210mm'`) |
+| `pageHeight` | `string` | CSS length (`'10in'`, `'297mm'`) |
 | `pageSpecs` | `Record<string, PageSpecConfig>` | Named page types with dimensions + margins |
 | `elementTypes` | `ElementMapping[]` | How to detect, classify, and measure elements |
 | `fullPageClasses` | `string[]` | CSS classes for full-bleed pages |
@@ -195,8 +390,10 @@ Top-level configuration object:
 | `romanPageTypes` | `string[]` | Page types that get roman numeral labels |
 | `fonts` | `{ body, heading, code }` | Default font specs for fallback measurement |
 
-#### `ElementMapping`
-Per-element-type configuration:
+</details>
+
+<details>
+<summary><strong>ElementMapping</strong></summary>
 
 | Field | Type | Description |
 |---|---|---|
@@ -210,51 +407,42 @@ Per-element-type configuration:
 | `contentWidth` | `number?` | Width override for measurement |
 | `heightPadding` | `number?` | Extra height padding (px) |
 
-#### `FontSpec`
+</details>
+
+<details>
+<summary><strong>FontSpec</strong></summary>
+
 | Field | Type | Description |
 |---|---|---|
-| `font` | `string` | CSS font shorthand |
+| `font` | `string` | CSS font shorthand (`'10px Georgia, serif'`) |
 | `fontSize` | `number` | Font size in px |
 | `lineHeight` | `number` | Line height in px |
 
-### Core Functions
+</details>
 
-#### `collectContentBlocks(root, config) → ContentBlock[]`
-Walk the DOM and collect leaf-level content blocks. Uses `elementTypes` for detection and `fullPageClasses` / `containerSelectors` for classification.
+<details>
+<summary><strong>PageSpecConfig</strong></summary>
 
-#### `measureAllBlocks(blocks, config)`
-Measure all blocks using Pretext's text measurement. Populates `ContentBlock.measuredHeightPx`.
+| Field | Type | Description |
+|---|---|---|
+| `width` | `number` | Page width in px (at 96dpi) |
+| `height` | `number` | Page height in px (at 96dpi) |
+| `marginTop` | `number` | Top margin in px |
+| `marginBottom` | `number` | Bottom margin in px |
+| `marginLeft` | `number` | Left margin in px |
+| `marginRight` | `number` | Right margin in px |
+| `hasHeader` | `boolean` | Show running header on this page type |
+| `hasFooter` | `boolean` | Show page number on this page type |
 
-#### `breakPages(blocks, config) → PaginationResult`
-Run the page-breaking algorithm. Returns `{ pages, totalArabic, totalRoman }` with page assignments and labels (roman numerals for frontmatter, arabic for body).
+Use `pageSpecFromInches()` to create one from inch values instead of pixel math.
 
-#### `fragmentCodeBlocks(config?) → FragmentationResult`
-Fragment `<pre>` code blocks into line-level `<div>` elements so Chrome can break them across pages. See [docs/code-fragmentation.md](docs/code-fragmentation.md).
-
-#### `splitHighlightedHTML(html) → string[]`
-Split syntax-highlighted HTML into per-line strings, preserving open `<span>` tags across newlines.
-
-### DOM Injection
-
-#### `injectPaginatedDOM(result, config) → InjectionResult`
-Inject print-specific CSS from config (`@page` rules, break-inside selectors).
-
-#### `waitForAssetsReady() → { imageCount, loadedImages }`
-Wait for all images and fonts to load before printing.
-
-### Helpers
-
-#### `inches(n) → number`
-Convert inches to CSS pixels (at 96dpi).
-
-#### `pageSpecFromInches(opts) → PageSpecConfig`
-Create a page spec from inch values.
+</details>
 
 ## Architecture
 
 | Module | Responsibility |
 |---|---|
-| `config.ts` | Type definitions for configuration |
+| `config.ts` | Type definitions + helpers (`inches()`, `pageSpecFromInches()`) |
 | `page-spec.ts` | Page dimension math (content area, margins) |
 | `content-block.ts` | DOM walking + Pretext text measurement |
 | `page-breaker.ts` | Pure page-breaking algorithm |
@@ -266,7 +454,7 @@ The page-breaking algorithm is pure — it takes measured blocks and produces pa
 ## What Folio does NOT do
 
 - **HTML → PDF rendering** — Chrome does that via `page.pdf()`
-- **Post-processing** — Orphan page removal and image fixes are Chrome-specific workarounds that belong in your consumer script (see [docs/chrome-quirks.md](docs/chrome-quirks.md))
+- **Post-processing** — Orphan page removal and image fixes are Chrome workarounds (see [docs/chrome-quirks.md](docs/chrome-quirks.md))
 - **Book-specific styling** — Centering transforms, custom CSS — that's your job
 - **Header/footer layout** — Chrome's `displayHeaderFooter` handles this
 
