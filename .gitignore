@@ -1,0 +1,5 @@
+node_modules/
+dist/
+vendor/folio.bundle.js
+vendor/*.browser.js
+*.tmp
