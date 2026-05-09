@@ -1,6 +1,6 @@
 {
   "name": "@monotykamary/folio",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Book PDF pagination using @chenglou/pretext for text measurement and Chrome's native page breaking",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,7 +16,16 @@
     "bundle": "esbuild src/browser-entry.ts --bundle --format=iife --global-name=FolioInit --outfile=vendor/folio.bundle.js --platform=browser",
     "test": "echo \"Error: no test suite yet\" && exit 1"
   },
-  "keywords": ["pdf", "book", "folio", "pretext", "pagination", "chrome", "print", "pagedjs-alternative"],
+  "keywords": [
+    "pdf",
+    "book",
+    "folio",
+    "pretext",
+    "pagination",
+    "chrome",
+    "print",
+    "pagedjs-alternative"
+  ],
   "author": "Cheng Lou",
   "license": "MIT",
   "type": "module",
