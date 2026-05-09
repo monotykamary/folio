@@ -16,7 +16,10 @@
     "bundle": "esbuild src/browser-entry.ts --bundle --format=iife --global-name=FolioInit --outfile=vendor/folio.bundle.js --platform=browser",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint:dead": "knip --no-progress"
+    "lint:dead": "knip --no-progress",
+    "prepare": "husky",
+    "version": "npm run bundle && git add vendor/folio.bundle.js",
+    "postversion": "git push && git push --tags"
   },
   "keywords": [
     "pdf",
@@ -43,7 +46,10 @@
   },
   "devDependencies": {
     "@chenglou/pretext": "^0.0.6",
+    "@commitlint/cli": "^21.0.0",
+    "@commitlint/config-conventional": "^21.0.0",
     "esbuild": "^0.20.0",
+    "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "knip": "^6.12.2",
     "typescript": "^5.4.0",
