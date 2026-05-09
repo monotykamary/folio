@@ -18,7 +18,7 @@
     "test:watch": "vitest",
     "lint:dead": "knip --no-progress",
     "prepare": "husky",
-    "version": "npm run bundle && git add vendor/folio.bundle.js",
+    "version": "npm run bundle",
     "postversion": "git push && git push --tags"
   },
   "keywords": [
