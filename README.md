@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/folio-hero.png" alt="Folio hero illustration" width="600">
+  <img src="https://raw.githubusercontent.com/monotykamary/folio/main/assets/folio-hero.png" alt="Folio hero illustration" width="600">
 </p>
 
 <h1 align="center">@monotykamary/folio</h1>
