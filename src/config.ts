@@ -74,6 +74,16 @@ export interface BookConfig {
     heading: FontSpec
     code: FontSpec
   }
+
+  /**
+   * Page-break threshold: when remaining space on a page drops below this
+   * fraction of total content height, Folio starts a new page instead of
+   * fitting more content. 0.3 means "start a new page when < 30% remains".
+   * Higher values = more aggressive page breaks (fewer orphan lines).
+   * Set to 0 to disable early-break (fill pages as much as possible).
+   * Default: 0.3
+   */
+  breakThreshold?: number
 }
 
 /** Helper: inch → px at 96dpi */

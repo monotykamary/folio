@@ -71,6 +71,9 @@ function detectBreakAfter(element: Element): BreakAfter {
   const style = (element as HTMLElement).style
   if (style?.breakAfter === 'page' || style?.pageBreakAfter === 'always') return 'always'
   if (style?.breakAfter === 'avoid' || style?.pageBreakAfter === 'avoid') return 'avoid'
+  const computed = window.getComputedStyle(element)
+  if (computed.breakAfter === 'page' || computed.pageBreakAfter === 'always') return 'always'
+  if (computed.breakAfter === 'avoid' || computed.pageBreakAfter === 'avoid') return 'avoid'
   return 'auto'
 }
 
@@ -221,7 +224,13 @@ function measureText(
     const { height } = pretextLayout(prepared, width, lineHeight)
     return height + padding
   } catch {
-    return Math.ceil(text.length / 60) * lineHeight + padding
+    // Fallback when Pretext isn't available (e.g. test environments).
+    // Estimate characters-per-line from content width and font size.
+    // Avg char width ≈ 0.6 × fontSize for proportional fonts.
+    const fontSize = parseInt(font.match(/^(\d+)px/)?.[1] ?? '10', 10)
+    const avgCharWidth = fontSize * 0.6
+    const charsPerLine = Math.max(1, Math.floor(width / avgCharWidth))
+    return Math.ceil(text.length / charsPerLine) * lineHeight + padding
   }
 }
 

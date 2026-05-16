@@ -311,4 +311,47 @@ describe('toRoman (via breakPages)', () => {
     if (romanLabels.length > 2) expect(romanLabels[2]).toBe('iii')
     if (romanLabels.length > 3) expect(romanLabels[3]).toBe('iv')
   })
+
+  it('respects breakThreshold: 0 fills pages to capacity before breaking', () => {
+    const config: BookConfig = { ...BASE_CONFIG, breakThreshold: 0 }
+    // 8 blocks of 100px = 800px. Block 7 overflows (700+100=800 > 792).
+    // remaining = 792-700 = 92. 92 > 0*792 = 0 → push to current page.
+    // All 8 blocks fit on 1 page.
+    const blocks = Array.from({ length: 8 }, () =>
+      mockBlock({ measuredHeightPx: 100 })
+    )
+    const result = breakPages(blocks, config)
+    expect(result.pages).toHaveLength(1)
+    expect(result.pages[0].blocks).toHaveLength(8)
+  })
+
+  it('respects breakThreshold: 1 forces early break on overflow', () => {
+    const config: BookConfig = { ...BASE_CONFIG, breakThreshold: 1 }
+    // 8 blocks of 100px. Block 7 overflows (800 > 792).
+    // remaining = 92. 92 > 1*792 = 792 → NO → flush, start new page.
+    const blocks = Array.from({ length: 8 }, () =>
+      mockBlock({ measuredHeightPx: 100 })
+    )
+    const result = breakPages(blocks, config)
+    expect(result.pages).toHaveLength(2)
+  })
+
+  it('resets to default page type after a fullpage element', () => {
+    const config: BookConfig = {
+      ...BASE_CONFIG,
+      pageSpecs: { default: DEFAULT_SPEC, cover: COVER_SPEC },
+    }
+    const blocks = [
+      mockBlock({ measuredHeightPx: 100 }),
+      mockBlock({ measuredHeightPx: 960, isFullPage: true, pageName: 'cover' }),
+      mockBlock({ measuredHeightPx: 100 }),
+    ]
+    const result = breakPages(blocks, config)
+    // After the cover page, the next block should be on a 'default' page
+    // (not inheriting 'cover' and its zero margins)
+    expect(result.pages).toHaveLength(3)
+    expect(result.pages[0].pageName).toBe('default')
+    expect(result.pages[1].pageName).toBe('cover')
+    expect(result.pages[2].pageName).toBe('default')
+  })
 })

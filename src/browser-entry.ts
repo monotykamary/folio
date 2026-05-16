@@ -55,9 +55,9 @@ window.Folio = {
 // Type declarations for window augmentation
 declare global {
   interface Window {
-    Pretext: typeof import('@chenglou/pretext')
+    Pretext: Pick<typeof import('@chenglou/pretext'), 'prepare' | 'layout' | 'prepareWithSegments' | 'layoutWithLines'>
     Folio: {
-      Pretext: typeof import('@chenglou/pretext')
+      Pretext: Pick<typeof import('@chenglou/pretext'), 'prepare' | 'layout' | 'prepareWithSegments' | 'layoutWithLines'>
       specsFromConfig: typeof specsFromConfig
       getSpec: typeof getSpec
       contentWidth: typeof contentWidth

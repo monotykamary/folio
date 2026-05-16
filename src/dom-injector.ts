@@ -20,6 +20,14 @@ export function injectPaginatedDOM(
     return `@page ${name} { margin: ${margin}; }`
   }).join('\n')
 
+  // Build page: <name> CSS property rules so Chrome matches elements
+  // to their named @page rules. Without this, @page cover { margin: 0 }
+  // never applies because no element has page: cover.
+  const pageProperties = config.elementTypes
+    .filter(m => m.pageName && m.selector)
+    .map(m => `${m.selector} { page: ${m.pageName}; }`)
+    .join('\n      ')
+
   // Build break-inside: avoid rules from element types
   const avoidBreakSelectors = config.elementTypes
     .filter(m => m.breakInside === 'avoid')
@@ -31,6 +39,9 @@ export function injectPaginatedDOM(
     @media print {
       @page { margin: 0; }
       ${pageRules}
+
+      ${pageProperties ? `/* page: property matching for named @page rules */
+      ${pageProperties}` : ''}
 
       ${avoidBreakSelectors.length > 0 ? `${avoidBreakSelectors.join(',\n      ')} {\n        break-inside: avoid;\n        page-break-inside: avoid;\n      }` : ''}
 

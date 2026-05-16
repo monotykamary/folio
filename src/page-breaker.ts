@@ -1,6 +1,8 @@
 import { type BookConfig } from './config'
 import { type PageSpec, specsFromConfig, getSpec, contentHeight, contentWidth } from './page-spec'
 import { type ContentBlock, measureAllBlocks, collectContentBlocks } from './content-block'
+import { injectPaginatedDOM } from './dom-injector'
+import { fragmentCodeBlocks, type FragmentationConfig, type FragmentationResult } from './code-fragmenter'
 
 export interface Page {
   index: number
@@ -72,12 +74,19 @@ export function breakPages(
     currentY = 0
   }
 
+  // Page-break threshold: 0.3 means "start a new page when < 30% remains"
+  const breakThreshold = config.breakThreshold ?? 0.3
+
   function availableHeight(): number {
     return contentHeight(currentSpec)
   }
 
   for (const block of blocks) {
-    const blockPageName = block.pageName || (romanTypes.has(currentPageName) ? currentPageName : 'default')
+    // Inherit the current page type when a block has no explicit pageName.
+    // This avoids accidentally persisting roman-numbered page types into
+    // body content — blocks without a pageName always inherit the running
+    // page type regardless of roman/non-roman status.
+    const blockPageName = block.pageName || currentPageName
     const blockSpec = getSpec(specs, blockPageName)
 
     if (block.chapterTitle) {
@@ -93,6 +102,10 @@ export function breakPages(
       currentBlocks.push(block)
       currentY = block.measuredHeightPx
       flushPage()
+
+      // Reset to default page state after a fullpage element so subsequent
+      // body content doesn't inherit the fullpage's page type (e.g. 'cover').
+      startNewPage('default')
       continue
     }
 
@@ -134,7 +147,7 @@ export function breakPages(
         startNewPage(blockPageName)
       } else {
         const remaining = avail - currentY
-        if (remaining > avail * 0.3) {
+        if (remaining > avail * breakThreshold) {
           currentBlocks.push(block)
           currentY += block.measuredHeightPx
           if (block.breakAfter === 'always') {
@@ -224,7 +237,6 @@ export async function paginate(
   // 2. Inject @page CSS from config
   let injected = false
   if (options.injectCSS !== false) {
-    const { injectPaginatedDOM } = await import('./dom-injector')
     const result = injectPaginatedDOM(pagination, config)
     injected = result.injectedPages > 0
   }
@@ -232,7 +244,6 @@ export async function paginate(
   // 3. Fragment code blocks
   let fragmentation: FragmentationResult | null = null
   if (options.fragmentation !== false) {
-    const { fragmentCodeBlocks } = await import('./code-fragmenter')
     fragmentation = fragmentCodeBlocks(
       options.fragmentation || undefined
     )

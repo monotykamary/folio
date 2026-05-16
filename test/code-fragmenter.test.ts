@@ -132,6 +132,32 @@ describe('splitHighlightedHTML()', () => {
     expect(result).toHaveLength(1)
     expect(result[0]).toBe('before<hr>after')
   })
+
+  it('skips HTML comments within highlighted code', () => {
+    // The comment <!--region--> should be passed through as-is and not
+    // treated as an opening tag that gets pushed onto the tag stack.
+    const html = '<span class="a">code<!--region-->\nnext</span>'
+    const result = splitHighlightedHTML(html)
+    expect(result).toHaveLength(2)
+    expect(result[0]).toContain('<!--region-->')
+    expect(result[0]).toContain('code')
+    expect(result[1]).toContain('next')
+  })
+
+  it('skips DOCTYPE declarations within highlighted code', () => {
+    const html = 'x\n<!DOCTYPE html>\ny'
+    const result = splitHighlightedHTML(html)
+    expect(result).toHaveLength(3)
+    expect(result[1]).toContain('<!DOCTYPE html>')
+  })
+
+  it('handles multi-line HTML comments', () => {
+    const html = 'start<!--\ncomment body\n-->end'
+    const result = splitHighlightedHTML(html)
+    expect(result).toHaveLength(1)
+    expect(result[0]).toContain('<!--')
+    expect(result[0]).toContain('-->')
+  })
 })
 
 describe('fragmentCodeBlocks()', () => {

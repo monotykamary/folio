@@ -84,6 +84,21 @@ export function splitHighlightedHTML(html: string): string[] {
 
   while (i < html.length) {
     if (html[i] === '<') {
+      // Treat HTML comments and DOCTYPE as passthrough text — they are not
+      // real tags and should not be pushed onto the open-tag stack.
+      const isComment = html.substring(i, i + 4) === '<!--'
+      const isDoctype = html.substring(i, i + 9).toLowerCase() === '<!doctype'
+      if (isComment || isDoctype) {
+        const end = isComment
+          ? html.indexOf('-->', i + 4)
+          : html.indexOf('>', i + 9)
+        if (end !== -1) {
+          currentLine += html.substring(i, end + (isComment ? 3 : 1))
+          i = end + (isComment ? 3 : 1)
+          continue
+        }
+      }
+
       const parsed = parseTag(html, i)
       if (!parsed) { currentLine += html.slice(i); break }
       const tag = parsed.tag

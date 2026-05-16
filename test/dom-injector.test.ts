@@ -142,4 +142,32 @@ describe('injectPaginatedDOM()', () => {
     const css = style?.textContent || ''
     expect(css).toContain('@page { margin: 0; }')
   })
+
+  it('injects page: CSS property for element types with pageName', () => {
+    const dom = setupDOM()
+    const configWithPageProps: BookConfig = {
+      ...SIMPLE_CONFIG,
+      elementTypes: [
+        ...SIMPLE_CONFIG.elementTypes,
+        { selector: '.cover-page', pageName: 'cover', breakInside: 'avoid', measureAs: 'fixed', fixedHeight: 960, isFullPage: true },
+        { selector: '.title-page', pageName: 'title-page', breakInside: 'avoid', measureAs: 'fixed', fixedHeight: 960, isFullPage: true },
+        { selector: '.chapter', pageName: 'chapter', breakInside: 'auto', measureAs: 'fixed', fixedHeight: 70 },
+      ],
+    }
+    injectPaginatedDOM(mockPagination(['default']), configWithPageProps)
+    const style = dom.window.document.getElementById('folio-injection-style')
+    const css = style?.textContent || ''
+    expect(css).toContain('.cover-page { page: cover; }')
+    expect(css).toContain('.title-page { page: title-page; }')
+    expect(css).toContain('.chapter { page: chapter; }')
+  })
+
+  it('does not inject page: property for element types without pageName', () => {
+    const dom = setupDOM()
+    injectPaginatedDOM(mockPagination(['default']), SIMPLE_CONFIG)
+    const style = dom.window.document.getElementById('folio-injection-style')
+    const css = style?.textContent || ''
+    // h1, p, figure don't have pageName, so no page: properties expected
+    expect(css).not.toContain('{ page:')
+  })
 })
