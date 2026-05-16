@@ -79,27 +79,80 @@ doc.save('output.pdf')
 ## 3. Named `@page` Rules Don't Always Apply
 
 ### Problem
-Chrome supports CSS named pages (`@page title-page { margin: 0; }`) but they don't apply reliably for pages immediately after `@page :first`.
+Chrome supports CSS named pages (`@page cover { margin: 0; }`) but they don't apply reliably. When a named `@page` rule fails, the page falls back to the unnamed `@page { ... }` rule. This causes cascading failures because Folio injects `@page { margin: 0; }` as the unnamed fallback (to satisfy the `page.pdf({ margin: 0 })` contract) — so any page whose named rule doesn't apply gets **zero margins** instead of its intended layout.
 
-### What Works
-- `@page :first { margin: 0; }` — always works
-- `@page cover { margin: 0; }` — works for pages with `page: cover` set via CSS
-- `@page fullpage { margin: 0; }` — works for pages after chapter content
+### Which Pages Are Affected
+- **`@page title-page { margin: 0; }`** — fails often for pages immediately after `:first` (the cover). The title page gets the unnamed `margin: 0` fallback instead of zero margins, causing flex-centered content to misalign.
+- **`@page fullpage-image { margin: 0; }`** — fails when the `page:` CSS property name doesn't match between `injectPaginatedDOM` (which uses `pageName` from the config) and the user's static CSS.
+- **`@page frontmatter { ... }`** — fails for dedication, ToC, and other frontmatter pages, causing them to lose their margins and page number style (roman → arabic).
+- **`@page chapter { ... }`** — fails less often but can cause chapter pages to lose their running headers.
 
-### What Doesn't Work Reliably
-- `@page title-page { margin: 0; }` on the page right after the cover (`:first`)
+### Why It Happens
+Chrome's `@page` implementation is unreliable in print mode. The `page:` CSS property on elements and the matching `@page <name>` rule don't always connect. This is a Chrome bug, not a CSS spec issue — the same CSS works in other browsers.
 
-### Workaround
-Use CSS `transform` to simulate the effect of zero margins:
+### Symptoms
+When a named `@page` rule fails:
+1. **Zero-margin pages (cover, title, fullpage)** get the unnamed `@page { margin: 0 }` — they still have zero margins, which happens to be correct. But content that relied on named-page-specific behavior (like running header suppression) won't get it.
+2. **Margin-bearing pages (frontmatter, chapter)** get the unnamed `@page { margin: 0 }` instead of their intended margins. Content overflows, centering breaks, page numbers vanish.
+3. **CSS margin boxes** (`@bottom-center`) from the named `@page` rule don't render. Page numbers fall back to the unnamed rule's margin box behavior.
+
+### Workaround: Redundant Named Page Injection
+The only reliable approach is **belt-and-suspenders**: explicitly re-inject EVERY named `@page` rule in your own `<style>` element after calling `injectPaginatedDOM()`. This ensures that even when Chrome's named page bug triggers, a correct named `@page` rule exists in a later stylesheet.
+
+```js
+await page.evaluate((config) => {
+  // Let Folio inject generic @page + page: properties
+  window.Folio.injectPaginatedDOM(paginationResult, config)
+
+  // Then re-state every named @page rule explicitly as a safety net.
+  // Chrome's last-css-wins means these override Folio's rules
+  // when the named page bug tries to fall back.
+  const style = document.createElement('style')
+  style.textContent = `
+    @media print {
+      /* Keep the unnamed fallback at safe margins, not zero.
+         This is the critical safety net — when any named page
+         fails, the fallback is safe instead of margin: 0. */
+      @page {
+        margin: 0.75in 0.875in 1in 0.875in;
+      }
+
+      /* Re-state every named page rule */
+      @page default { margin: 0.75in 0.875in 1in 0.875in; }
+      @page cover { margin: 0; @top-center: none; @bottom-center: none; }
+      @page title-page { margin: 0; @top-center: none; @bottom-center: none; }
+      @page part { margin: 0; @top-center: none; @bottom-center: none; }
+      @page frontmatter { margin: 0.75in 0.875in 1in 0.875in; }
+      @page chapter { margin: 0.75in 0.875in 1in 0.875in; }
+      @page fullpage { margin: 0; @top-center: none; @bottom-center: none; }
+      @page fullpage-image { margin: 0; @top-center: none; @bottom-center: none; }
+    }
+  `
+  document.head.appendChild(style)
+}, config)
+```
+
+### Workaround: Transform-Based Centering
+For full-bleed pages with centered content (title page, part dividers), don't rely on flexbox centering — Chrome's print renderer doesn't support it reliably even when `@page margins` are correct. Use `transform: translate()` instead:
 
 ```css
 .title-page {
-  /* Instead of relying on @page title-page { margin: 0 } */
-  transform: translateX(0.875in);  /* compensate for missing margin */
+  width: 100%;  /* adapts to actual content area width */
+  transform: translateY(1.5in) !important;
 }
 ```
 
-See [centering-pages.md](centering-pages.md) for detailed centering techniques.
+The `width: 100%` prevents overflow when the content area is narrower than expected (e.g., 5.25in instead of 7in). See [centering-pages.md](centering-pages.md) for calibration techniques.
+
+### Workaround: CSS Margin Boxes vs displayHeaderFooter
+`displayHeaderFooter: true` renders page numbers on every page with no way to exclude the cover. CSS `@page margin boxes` (`@bottom-center`) support per-page control via named `@page` rules — but they depend on those rules working. The safe approach is:
+
+- Use CSS margin boxes for page numbers (per-page control)
+- Suppress margin boxes on the unnamed `@page` fallback so pages don't get duplicate numbers
+- Accept that when Chrome's named page bug triggers, page numbering may fall back to arabic instead of roman for frontmatter
+
+### Why This Matters for Folio Users
+Folio's `injectPaginatedDOM()` injects `@page` rules and `page:` CSS properties from your `BookConfig`. This is correct per the CSS spec. But Chrome's bug means you should **always** re-state your `@page` rules redundantly in your own print CSS as described above. Folio handles the generic scaffolding; your redundant rules are the safety net.
 
 ## 4. `object-fit` Ignored in Print Mode
 

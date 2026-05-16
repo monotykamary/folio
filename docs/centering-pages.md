@@ -26,23 +26,32 @@ The most reliable workaround is to use `transform` to shift content into the vis
 ```css
 @media print {
   .title-page {
-    /* Force zero margins via transform instead of @page */
-    transform: translate(1.15in, 2.17in) !important;
-    justify-content: center !important;
-    align-items: center !important;
+    /* width: 100% prevents overflow clipping when Chrome's named @page
+       bug causes fallback to the unnamed @page with non-zero margins.
+       A fixed width (e.g. 7in) would overflow the narrower content area
+       and get clipped, shifting content left. */
+    width: 100% !important;
+    /* Use transform for vertical centering since Chrome's print renderer
+       doesn't reliably support flexbox centering. */
+    transform: translateY(1.5in) !important;
     padding: 1in !important;
   }
 }
 ```
 
-The values are calculated as:
-- `translateX(1.15in)` — compensates for the left margin that Chrome incorrectly applies (0.875in) plus adjusts for content offset
-- `translateY(2.17in)` — shifts content from its natural position to the page center
+The values are calculated for a page where `@page title-page { margin: 0 }` is correctly applied (full-bleed). The `padding: 1in` provides horizontal centering. The `translateY` shifts content to vertical center:
+- Page height: 10in
+- Padding: 1in top + 1in bottom
+- Content area: 8in tall
+- Content height: ~5in (title + subtitle + author + copyright)
+- Shift: (8 - 5) / 2 ≈ 1.5in
+
+**Why `width: 100%` instead of a fixed width?** When Chrome's named `@page` bug causes the title page to fall back to the unnamed `@page { margin: 0.875in left }`, the content area is only 5.25in wide. A fixed `width: 7in` would overflow by 1.75in and get clipped — shifting all content left. `width: 100%` adapts to the actual content area width regardless of which `@page` rule Chrome uses.
 
 #### How to Calculate the Values
 
 1. Generate the PDF without any transform
-2. Use PyMuPDF to find the current center of content on the title page:
+2. Use PyMuPDF to find the current center of content:
 
 ```python
 import fitz
@@ -51,32 +60,25 @@ page = doc[title_page_index]
 blocks = page.get_text('dict')['blocks']
 
 y_positions = []
-x_centers = []
 for b in blocks:
     if b['type'] == 0:
         for line in b['lines']:
             for span in line['spans']:
                 y_positions.append(span['origin'][1])
-                x_centers.append((span['bbox'][0] + span['bbox'][2]) / 2)
 
 current_cy = (min(y_positions) + max(y_positions)) / 2
-current_cx = sum(x_centers) / len(x_centers)
 
-# Target center for 7×10in page
+# Target center for 7x10in page
 target_cy = 360  # 720pt / 2 = 360 (in points at 72dpi)
-target_cx = 252  # 504pt / 2
 
-print(f'Current center: ({current_cx:.0f}, {current_cy:.0f})pt')
-print(f'Target center: ({target_cx}, {target_cy})pt')
-print(f'Adjust translateX by: {(target_cx - current_cx)/54:.2f}in')  # ~54dpi intermediate
-print(f'Adjust translateY by: {(target_cy - current_cy)/54:.2f}in')
+print(f'Adjust translateY by: {(target_cy - current_cy)/54:.2f}in')  # ~54dpi intermediate
 ```
 
 **Note**: Chrome resolves CSS `in` units at an intermediate DPI (~54, not 72 or 96) during print layout. The exact value varies — measure empirically.
 
 ### Part Divider Centering
 
-Part dividers are typically shorter content (a title and subtitle) centered vertically:
+Part dividers are typically shorter content (a title and subtitle) centered vertically. The `@page part { margin: 0; }` must be redundantly injected (see chrome-quirks.md §3) for the full-bleed layout to work. The `translateY` value positions the top of the content so its visual center aligns with the page center:
 
 ```css
 @media print {
@@ -87,11 +89,11 @@ Part dividers are typically shorter content (a title and subtitle) centered vert
 }
 ```
 
-The translateY value positions the top of the content so its visual center aligns with the page center.
-
 ### Dedication Centering
 
-````css
+Dedications are typically short enough that `padding: 2in` centers them on the page without needing `transform`:
+
+```css
 @media print {
   .dedication {
     justify-content: center !important;
@@ -99,9 +101,7 @@ The translateY value positions the top of the content so its visual center align
     padding: 2in !important;
   }
 }
-````
-
-Dedications are typically short enough that `padding: 2in` centers them on the page without needing `transform`.
+```
 
 ## Why Not `flex` or `grid`?
 
